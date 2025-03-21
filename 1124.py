@@ -1,3 +1,4 @@
+#1124.py
 import mysql.connector
 import json
 from facenet_pytorch import MTCNN, InceptionResnetV1
@@ -83,8 +84,8 @@ def add_to_database(name, embedding_vector):
     cursor = conn.cursor()
 
     cursor.execute("""
-    INSERT INTO users (name, age, embedding_vector) VALUES (%s, %s, %s)
-    """, (name, 30, json.dumps(embedding_vector)))
+    INSERT INTO users (name, embedding_vector) VALUES (%s,%s)
+    """, (name, json.dumps(embedding_vector)))
 
     conn.commit()
     cursor.close()
@@ -136,7 +137,7 @@ def main():
 
             # 화면에 바운딩 박스 그리기
             cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-            display_name = closest_name if closest_name else "Guest"
+            display_name = closest_name if closest_name else "Unknown"
             cv2.putText(frame, display_name, (x1, y1 - 10),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
 

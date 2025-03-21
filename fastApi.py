@@ -1,3 +1,4 @@
+# FastApi.py 이거 실행하고 인텔리제이 실행!! (얼굴인식 최종코드)
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 import cv2
@@ -58,6 +59,25 @@ class FaceRecognition:
         with torch.no_grad():
             return self.facenet(face_tensor).cpu().numpy().flatten()
 
+    # def find_closest_match(self, embedding_vector, threshold=0.35):
+    #     conn = connect_database()
+    #     cursor = conn.cursor(dictionary=True)
+    #     cursor.execute("SELECT name, embedding_vector FROM users")
+    #     rows = cursor.fetchall()
+    #
+    #     closest_name = None
+    #     min_distance = float('inf')
+    #     for row in rows:
+    #         db_embedding = np.array(json.loads(row["embedding_vector"])).flatten()
+    #         distance = cosine(embedding_vector, db_embedding)
+    #         if distance < threshold and distance < min_distance:
+    #             closest_name = row["name"]
+    #             min_distance = distance
+    #
+    #     cursor.close()
+    #     conn.close()
+    #     return closest_name
+
     def find_closest_match(self, embedding_vector, threshold=0.35):
         conn = connect_database()
         cursor = conn.cursor(dictionary=True)
@@ -65,17 +85,32 @@ class FaceRecognition:
         rows = cursor.fetchall()
 
         closest_name = None
-        min_distance = float('inf')
+        min_distance = float('inf') # 가장 낮은 거리 저장
+        best_score = 0  # 유사도 점수 (1 - 코사인 거리), 가장 높은 유사도 저장
+
         for row in rows:
             db_embedding = np.array(json.loads(row["embedding_vector"])).flatten()
             distance = cosine(embedding_vector, db_embedding)
-            if distance < threshold and distance < min_distance:
-                closest_name = row["name"]
+            similarity = 1 - distance  # 유사도를 0~1 범위로 변환
+
+            # similarity가 더 높으면 저장 (threshold와 관계 없이)
+            if similarity > best_score:
+                best_score = similarity
                 min_distance = distance
+                closest_name = row["name"]
+
+            # threshold는 인식 여부 판단용 (이름만 None 처리)
+        if min_distance > threshold:
+            closest_name = None
+            # if distance < threshold and distance < min_distance:
+            #     closest_name = row["name"]
+            #     min_distance = distance
+            #     best_score = similarity  # 가장 높은 유사도 저장
 
         cursor.close()
         conn.close()
-        return closest_name
+
+        return closest_name, best_score  # 유사도 점수 추가 반환
 
     def process_frame(self, image_rgb):
         boxes, _ = self.detect_faces(image_rgb)
@@ -86,8 +121,13 @@ class FaceRecognition:
             face_image = Image.fromarray(face_crop)
 
             embedding = self.get_embedding(face_image)
-            closest_name = self.find_closest_match(embedding)
+            #closest_name = self.find_closest_match(embedding)
 
+            # ✅ 가장 가까운 사용자 찾기 (이름 & 정확도 반환)
+            closest_name, accuracy = self.find_closest_match(embedding)
+
+            # ✅ 정확도 출력 (로그)
+            print(f"인식된 사용자: {closest_name}, 정확도: {accuracy:.2f}")
             # 이름 변경 시 타이머 초기화
             if closest_name != self.previous_name:
                 self.previous_name = closest_name
